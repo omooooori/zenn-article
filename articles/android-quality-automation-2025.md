@@ -22,12 +22,12 @@ published: false
 
 ## 4つの自動化施策
 
-| 施策 | 解決する課題 | 状況 |
-|------|-------------|------|
-| Screenshot Testing | UIの視覚的変化を見逃す | PR作成済み |
-| Library Update管理 | 技術的負債の蓄積 | 対応中 |
-| Performance Monitoring | パフォーマンス劣化に気づかない | 計画・一部導入済み |
-| Auto Crash Fix | クラッシュ対応が後回しになる | PR作成済み |
+| 施策 | 解決する課題 |
+|------|-------------|
+| Screenshot Testing | UIの視覚的変化を見逃す |
+| Library Update管理 | 技術的負債の蓄積 |
+| Performance Monitoring | パフォーマンス劣化に気づかない |
+| Auto Crash Fix | クラッシュ対応が後回しになる |
 
 ## 1. Screenshot Testing - UIの変更を見逃さない
 
