@@ -52,3 +52,8 @@ Push to GitHub to auto-deploy. Use `[ci skip]` in commit messages to skip deploy
 
 - Write commit messages in English, one line, concise
 - Do NOT include AI stamps or co-author tags
+
+## Language
+
+- Conversation: Japanese
+- Commit messages: English
