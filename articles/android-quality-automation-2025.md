@@ -3,7 +3,7 @@ title: "Androidアプリの品質を「忘れない」ための自動化戦略"
 emoji: "🤖"
 type: "tech"
 topics: ["android", "ci", "githubactions", "ai"]
-published: false
+published: true
 ---
 
 ## はじめに
