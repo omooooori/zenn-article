@@ -25,9 +25,9 @@ published: true
 | 施策 | 解決する課題 |
 |------|-------------|
 | Screenshot Testing | UIの視覚的変化を見逃す |
+| Auto Crash Fix | クラッシュ対応が後回しになる |
 | Library Update管理 | 技術的負債の蓄積 |
 | Performance Monitoring | パフォーマンス劣化に気づかない |
-| Auto Crash Fix | クラッシュ対応が後回しになる |
 
 ## 1. Screenshot Testing - UIの変更を見逃さない
 
@@ -75,151 +75,7 @@ Screenshot Testで重要なのは、テストの安定性です。ローカル�
 - **全UI表示状態をテスト**: 動的に変わるUIは、全て表示された状態でゴールデン画像を作成
 - **CI上でゴールデン画像を生成**: 環境差異による差分を防ぎ、テストの安定性を確保
 
-## 2. Library Update管理 - 技術的負債を溜めない
-
-### 課題
-
-ライブラリの更新は、「今は動いているから後で」と後回しにされがちです。定期的に棚卸しをしないと、いつの間にか古くなってしまいます。
-
-### 現状の棚卸し
-
-まず、主要ライブラリの現状を可視化しました。
-
-| Library | Current | Latest | Priority |
-|---------|---------|--------|----------|
-| Kotlin | 2.1.0 | 2.2.x | 🔴 High |
-| AGP | 8.7.3 | 8.13.x | 🔴 High |
-| Compose BOM | 2025.05.01 | 2025.09.01+ | 🟡 Medium |
-| Dagger Hilt | 2.54 | 2.57.2 | 🟡 Medium |
-| Navigation Compose | 2.9.0 | 2.9.6 | 🟢 Low |
-| Lifecycle | 2.8.7 | 2.10.0 | 🟢 Low |
-| Coil | 3.0.0-rc01 | 3.x stable | 🟡 Medium |
-| Core KTX | 1.15.0 | 1.17.0 | 🟢 Low |
-
-### リスクベースの段階的アップデート
-
-優先度は「更新量の大きさ」と「破壊的変更の可能性」で判断しています。
-
-**Phase 1 - 低リスク（更新量が少ない）**
-- Navigation Compose 2.9.0 → 2.9.6
-- Core KTX 1.15.0 → 1.17.0
-- Lifecycle 2.8.7 → 2.10.0
-- Coil rc → stable
-
-**Phase 2 - 中リスク**
-- Dagger Hilt 2.54 → 2.57.2
-- Compose BOM 2025.05.01 → 2025.09.01
-
-**Phase 3 - 破壊的変更の可能性あり**
-- Kotlin 2.1.0 → 2.2.x
-- AGP 8.7.3 → 8.13.x
-
-AvvyではKMM（Kotlin Multiplatform Mobile）を採用し、Android/iOS間でUseCase・Repository層を共通化しています。そのため、KotlinやAGPのバージョンを上げる際はKMM側の対応状況も考慮する必要があり、簡単には最新化できません。これがPhase 3を最後に回す理由です。
-
-### 今後の自動化
-
-古いライブラリを片付けたら、以下の自動化を予定しています。
-
-#### Renovate導入
-
-依存関係の自動更新PR作成にRenovateを導入します。
-
-```json
-{
-  "extends": ["config:recommended", ":dependencyDashboard"],
-  "timezone": "Asia/Tokyo",
-  "schedule": ["before 9am on Monday"],
-  "packageRules": [
-    {
-      "matchUpdateTypes": ["patch"],
-      "automerge": true
-    },
-    {
-      "groupName": "Kotlin",
-      "matchPackagePatterns": ["^org.jetbrains.kotlin"]
-    },
-    {
-      "groupName": "Compose",
-      "matchPackagePatterns": ["androidx.compose"]
-    },
-    {
-      "groupName": "Firebase",
-      "matchPackagePatterns": ["^com.google.firebase"]
-    },
-    {
-      "groupName": "Hilt",
-      "matchPackagePatterns": ["^com.google.dagger", "^androidx.hilt"]
-    }
-  ],
-  "vulnerabilityAlerts": {
-    "enabled": true
-  }
-}
-```
-
-ポイントは以下の通りです。
-
-- **毎週月曜の朝にチェック**: 週1回に絞ることでPRの洪水を防ぐ
-- **パッチバージョンは自動マージ**: 低リスクな更新は自動化
-- **関連ライブラリをグルーピング**: Compose、Firebase、Hilt等は1つのPRにまとめる
-- **脆弱性アラート有効化**: セキュリティ問題は即座に検知
-
-#### AIによる変更履歴分析
-
-Renovateが作成するPRに対して、AIが変更履歴と影響箇所を自動で出力する仕組みも構築予定です。
-
-### ポイント
-
-- **一気にやらない**: 破壊的変更があるライブラリは最後に回す
-- **更新量で優先度を判断**: マイナーバージョンの差が小さいものから着手
-- **自動化で継続性を担保**: 一度きれいにしても、また古くなっては意味がない
-
-## 3. Performance Monitoring - パフォーマンス劣化を検知する
-
-### 課題
-
-パフォーマンスの問題は、普段の開発では気づきにくいものです。
-
-そして最悪なのは、**ユーザーからの報告で初めて気づく**というパターンです。
-
-- App Storeのレビューで「最近アプリが重い」と書かれる
-- Xで「Avvy重くない？」とポストされる
-- Play Console Vitalsでジャンク率上昇を発見するも、いつから・何が原因かわからない
-
-ユーザーに指摘されてから対応するのでは遅すぎます。**開発者が自分たちで気づける体制**を整える必要があります。
-
-### 解決策
-
-包括的なパフォーマンスモニタリング基盤を構築しています。
-
-**Phase 1: Foundation**
-- Baseline Profiles（AOT最適化）
-- Macrobenchmarkモジュール（CI計測用）
-- Looker Studioダッシュボードの検証
-
-**Phase 2: Expanded Observability**
-- Firebase Performance traces（重要なユーザーフロー）
-- JankStats（Composeのフレームドロップ検出）
-
-**Phase 3: CI Integration**
-- GitHub ActionsにMacrobenchmarkを統合
-- エミュレータでリグレッション検出
-
-**Phase 4: Dashboard & Scoring**
-- Looker StudioダッシュボードをNotionに埋め込み
-- パフォーマンススコアリングシステム
-
-### 現在の状況
-
-Firebase Performanceの導入が完了し、以降のPhaseを順次進めています。
-
-### ポイント
-
-- **計測できないものは改善できない**: まずは可視化から
-- **CIに組み込む**: リリース前にリグレッションを検出
-- **スコアリング**: 数値化することでチーム全体の意識が変わる
-
-## 4. Auto Crash Fix - AIがクラッシュを自動修正
+## 2. Auto Crash Fix - AIがクラッシュを自動修正
 
 ### 課題
 
@@ -289,6 +145,157 @@ PRを作成する前に`./gradlew assembleDebug`と`./gradlew testDebugUnitTest`
 - **Linear連携**: 追跡可能性を担保
 - **ビルド・テスト必須**: CIが通らないPRは作成しない
 
+## 3. Library Update管理 - 技術的負債を溜めない
+
+### 課題
+
+ライブラリの更新は、「今は動いているから後で」と後回しにされがちです。定期的に棚卸しをしないと、いつの間にか古くなってしまいます。
+
+### 現状の棚卸し
+
+まず、主要ライブラリの現状を可視化しました。
+
+| Library | Current | Latest | Priority |
+|---------|---------|--------|----------|
+| Kotlin | 2.1.0 | 2.2.x | 🔴 High |
+| AGP | 8.7.3 | 8.13.x | 🔴 High |
+| Compose BOM | 2025.05.01 | 2025.09.01+ | 🟡 Medium |
+| Dagger Hilt | 2.54 | 2.57.2 | 🟡 Medium |
+| Navigation Compose | 2.9.0 | 2.9.6 | 🟢 Low |
+| Lifecycle | 2.8.7 | 2.10.0 | 🟢 Low |
+| Coil | 3.0.0-rc01 | 3.x stable | 🟡 Medium |
+| Core KTX | 1.15.0 | 1.17.0 | 🟢 Low |
+
+### リスクベースの段階的アップデート
+
+優先度は「更新量の大きさ」と「破壊的変更の可能性」で判断しています。
+
+**Phase 1 - 低リスク（更新量が少ない）**
+
+- Navigation Compose 2.9.0 → 2.9.6
+- Core KTX 1.15.0 → 1.17.0
+- Lifecycle 2.8.7 → 2.10.0
+- Coil rc → stable
+
+**Phase 2 - 中リスク**
+
+- Dagger Hilt 2.54 → 2.57.2
+- Compose BOM 2025.05.01 → 2025.09.01
+
+**Phase 3 - 破壊的変更の可能性あり**
+
+- Kotlin 2.1.0 → 2.2.x
+- AGP 8.7.3 → 8.13.x
+
+AvvyではKMM（Kotlin Multiplatform Mobile）を採用し、Android/iOS間でUseCase・Repository層を共通化しています。そのため、KotlinやAGPのバージョンを上げる際はKMM側の対応状況も考慮する必要があり、簡単には最新化できません。これがPhase 3を最後に回す理由です。
+
+### 今後の自動化
+
+古いライブラリを片付けたら、以下の自動化を予定しています。
+
+#### Renovate導入
+
+依存関係の自動更新PR作成にRenovateを導入します。
+
+```json
+{
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "timezone": "Asia/Tokyo",
+  "schedule": ["before 9am on Monday"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    {
+      "groupName": "Kotlin",
+      "matchPackagePatterns": ["^org.jetbrains.kotlin"]
+    },
+    {
+      "groupName": "Compose",
+      "matchPackagePatterns": ["androidx.compose"]
+    },
+    {
+      "groupName": "Firebase",
+      "matchPackagePatterns": ["^com.google.firebase"]
+    },
+    {
+      "groupName": "Hilt",
+      "matchPackagePatterns": ["^com.google.dagger", "^androidx.hilt"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true
+  }
+}
+```
+
+ポイントは以下の通りです。
+
+- **毎週月曜の朝にチェック**: 週1回に絞ることでPRの洪水を防ぐ
+- **パッチバージョンは自動マージ**: 低リスクな更新は自動化
+- **関連ライブラリをグルーピング**: Compose、Firebase、Hilt等は1つのPRにまとめる
+- **脆弱性アラート有効化**: セキュリティ問題は即座に検知
+
+#### AIによる変更履歴分析
+
+Renovateが作成するPRに対して、AIが変更履歴と影響箇所を自動で出力する仕組みも構築予定です。
+
+### ポイント
+
+- **一気にやらない**: 破壊的変更があるライブラリは最後に回す
+- **更新量で優先度を判断**: マイナーバージョンの差が小さいものから着手
+- **自動化で継続性を担保**: 一度きれいにしても、また古くなっては意味がない
+
+## 4. Performance Monitoring - パフォーマンス劣化を検知する
+
+### 課題
+
+パフォーマンスの問題は、普段の開発では気づきにくいものです。
+
+そして最悪なのは、**ユーザーからの報告で初めて気づく**というパターンです。
+
+- App Storeのレビューで「最近アプリが重い」と書かれる
+- Xで「Avvy重くない？」とポストされる
+- Play Console Vitalsでジャンク率上昇を発見するも、いつから・何が原因かわからない
+
+ユーザーに指摘されてから対応するのでは遅すぎます。**開発者が自分たちで気づける体制**を整える必要があります。
+
+### 解決策
+
+包括的なパフォーマンスモニタリング基盤を構築しています。
+
+**Phase 1: Foundation**
+
+- Baseline Profiles（AOT最適化）
+- Macrobenchmarkモジュール（CI計測用）
+- Looker Studioダッシュボードの検証
+
+**Phase 2: Expanded Observability**
+
+- Firebase Performance traces（重要なユーザーフロー）
+- JankStats（Composeのフレームドロップ検出）
+
+**Phase 3: CI Integration**
+
+- GitHub ActionsにMacrobenchmarkを統合
+- エミュレータでリグレッション検出
+
+**Phase 4: Dashboard & Scoring**
+
+- Looker StudioダッシュボードをNotionに埋め込み
+- パフォーマンススコアリングシステム
+
+### 現在の状況
+
+Firebase Performanceの導入が完了し、以降のPhaseを順次進めています。
+
+### ポイント
+
+- **計測できないものは改善できない**: まずは可視化から
+- **CIに組み込む**: リリース前にリグレッションを検出
+- **スコアリング**: 数値化することでチーム全体の意識が変わる
+
 ## 共通する考え方
 
 これら4つの施策に共通するのは、以下の考え方です。
@@ -320,9 +327,9 @@ AIは完璧ではありませんが、単純作業や分析の初手を任せる
 今回紹介した4つの施策は、すべて「自動化」がキーワードです。
 
 1. Screenshot Testing → UIの変化を自動検出
-2. Library Update管理 → 更新を自動化
-3. Performance Monitoring → 劣化を自動検知
-4. Auto Crash Fix → 修正を自動提案
+2. Auto Crash Fix → 修正を自動提案
+3. Library Update管理 → 更新を自動化
+4. Performance Monitoring → 劣化を自動検知
 
 ### 品質チェックのタイミング
 
